@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent GOD 2 Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* ============================================================
+   ROOT & RESET
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--card:#1e293b;--card-hover:#263548;--border:#334155;
+  --text:#e2e8f0;--text-dim:#94a3b8;--text-muted:#64748b;
+  --accent:#818cf8;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--blue:#60a5fa;
+  --radius:8px;--shadow:0 4px 6px -1px rgba(0,0,0,.3);
+}
+html{font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--accent);text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+#header{
+  display:flex;align-items:center;gap:16px;
+  padding:10px 20px;background:var(--card);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+#header .logo{font-size:1.25rem;font-weight:700;color:var(--accent);white-space:nowrap}
+#header .logo span{color:var(--text)}
+.header-stats{display:flex;gap:20px;margin-left:auto;align-items:center}
+.header-stat{text-align:right}
+.header-stat .label{font-size:.7rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.5px}
+.header-stat .value{font-size:1rem;font-weight:600}
+.header-stat .positive{color:var(--green)}
+.header-stat .negative{color:var(--red)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.status-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.warn{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+
+/* ============================================================
+   LAYOUT: sidebar + main
+   ============================================================ */
+#app{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+#sidebar{
+  width:230px;min-width:230px;background:var(--card);
+  border-right:1px solid var(--border);overflow-y:auto;
+  display:flex;flex-direction:column;
+}
+.sidebar-section{padding:12px 14px 6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)}
+.nav-item{
+  padding:9px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;
+  font-size:.85rem;transition:background .15s;border-left:3px solid transparent;
+}
+.nav-item:hover{background:var(--card-hover)}
+.nav-item.active{background:rgba(129,140,248,.12);border-left-color:var(--accent);color:var(--accent);font-weight:600}
+.nav-item .icon{width:16px;text-align:center;flex-shrink:0;opacity:.7}
+.nav-item.active .icon{opacity:1}
+
+.strat-item{
+  padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;
+  font-size:.78rem;transition:background .15s;border-left:3px solid transparent;
+}
+.strat-item:hover{background:var(--card-hover)}
+.strat-item.active{background:rgba(129,140,248,.12);border-left-color:var(--accent)}
+.strat-item .strat-id{color:var(--text-dim);font-size:.7rem;min-width:32px}
+.strat-item .strat-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Phase pills */
+.pill{
+  display:inline-block;padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.3px;
+}
+.pill-PAPER{background:rgba(96,165,250,.2);color:var(--blue)}
+.pill-SHADOW{background:rgba(251,191,36,.2);color:var(--yellow)}
+.pill-LIVE{background:rgba(52,211,153,.2);color:var(--green)}
+.pill-ELIMINATED{background:rgba(248,113,113,.2);color:var(--red)}
+.pill-PAUSED{background:rgba(100,116,139,.25);color:var(--text-muted)}
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+#main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:20px}
+
+/* View toggle — hide all views except active */
+.view{display:none}
+.view.active{display:block}
+
+/* Cards & panels */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card-title{font-size:1rem;font-weight:600}
+.card-subtitle{font-size:.75rem;color:var(--text-muted)}
+
+/* KPI row */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center}
+.kpi .kpi-value{font-size:1.6rem;font-weight:700;margin:4px 0}
+.kpi .kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)}
+.kpi .kpi-sub{font-size:.7rem;color:var(--text-dim);margin-top:2px}
+
+/* Tables */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead th{
+  text-align:left;padding:8px 10px;font-weight:600;font-size:.7rem;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);
+  border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);
+}
+tbody td{padding:7px 10px;border-bottom:1px solid rgba(51,65,85,.4)}
+tbody tr:hover{background:var(--card-hover)}
+tbody tr.eliminated{opacity:.45}
+
+/* Chart containers */
+.chart-container{position:relative;height:280px;width:100%}
+.chart-container-sm{position:relative;height:200px;width:100%}
+
+/* Grids */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:1400px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* Progress bars */
+.progress-bar{background:rgba(51,65,85,.5);border-radius:4px;height:8px;overflow:hidden;position:relative}
+.progress-bar .fill{height:100%;border-radius:4px;transition:width .4s ease}
+.progress-bar .fill.green{background:var(--green)}
+.progress-bar .fill.red{background:var(--red)}
+.progress-bar .fill.blue{background:var(--blue)}
+.progress-bar .fill.yellow{background:var(--yellow)}
+.progress-bar .fill.accent{background:var(--accent)}
+
+/* Heatmap */
+.heatmap-grid{display:grid;gap:2px;font-size:.7rem}
+.heatmap-cell{
+  display:flex;align-items:center;justify-content:center;
+  padding:6px 4px;border-radius:3px;font-weight:600;min-height:36px;
+  transition:transform .1s;cursor:default;
+}
+.heatmap-cell:hover{transform:scale(1.05);z-index:1}
+.heatmap-header{font-weight:700;color:var(--text-dim);background:transparent !important}
+
+/* Kanban */
+.kanban{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;min-height:300px}
+.kanban-col{background:rgba(15,23,42,.5);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;flex-direction:column;gap:8px}
+.kanban-col-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.kanban-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:10px 12px;font-size:.78rem;
+}
+.kanban-card .kc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.kanban-card .kc-name{font-weight:600}
+.kanban-card .kc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.7rem;color:var(--text-dim)}
+
+/* Buttons */
+.btn{
+  padding:6px 14px;border:none;border-radius:var(--radius);cursor:pointer;
+  font-size:.78rem;font-weight:600;transition:all .2s;
+}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#ef4444;box-shadow:0 0 12px rgba(248,113,113,.4)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:#6366f1}
+.btn-sm{padding:4px 10px;font-size:.7rem}
+
+/* Live monitor specifics */
+.live-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:260px;color:var(--text-muted);gap:12px;
+}
+.live-empty .icon-big{font-size:2.5rem;opacity:.4}
+
+/* Position cards */
+.pos-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+}
+.pos-dir{font-weight:700;font-size:.85rem;padding:4px 10px;border-radius:4px}
+.pos-dir.LONG{background:rgba(52,211,153,.15);color:var(--green)}
+.pos-dir.SHORT{background:rgba(248,113,113,.15);color:var(--red)}
+
+/* Correlation matrix alerts */
+.corr-alert{border:2px solid var(--yellow) !important;animation:pulse-border 2s infinite}
+@keyframes pulse-border{0%,100%{border-color:var(--yellow)}50%{border-color:transparent}}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+#footer{
+  display:flex;align-items:center;gap:20px;
+  padding:8px 20px;background:var(--card);border-top:1px solid var(--border);
+  font-size:.72rem;color:var(--text-muted);flex-shrink:0;
+}
+#footer .footer-item{display:flex;align-items:center;gap:5px}
+
+/* Utility */
+.text-green{color:var(--green)}.text-red{color:var(--red)}.text-yellow{color:var(--yellow)}.text-blue{color:var(--blue)}.text-accent{color:var(--accent)}.text-dim{color:var(--text-dim)}.text-muted{color:var(--text-muted)}
+.text-right{text-align:right}.text-center{text-align:center}
+.font-mono{font-family:'SF Mono',Consolas,monospace}
+.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
+.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}
+.gap-12{gap:12px}.gap-16{gap:16px}
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.w-full{width:100%}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hidden{display:none !important}
+
+/* Loading spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Tooltip */
+[data-tooltip]{position:relative}
+[data-tooltip]:hover::after{
+  content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:#1a1a2e;color:var(--text);padding:4px 8px;border-radius:4px;font-size:.7rem;white-space:nowrap;z-index:200;
+  border:1px solid var(--border);pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header id="header">
+  <div class="logo">Agent GOD <span>2</span></div>
+  <div class="header-stats">
+    <div class="header-stat">
+      <div class="label">Portfolio Total</div>
+      <div class="value" id="h-portfolio">--</div>
+    </div>
+    <div class="header-stat">
+      <div class="label">Live Capital</div>
+      <div class="value" id="h-live-capital">$0.00</div>
+    </div>
+    <div class="header-stat">
+      <div class="label">BTC Price</div>
+      <div class="value font-mono" id="h-btc">--</div>
+    </div>
+    <div class="header-stat">
+      <div class="label">Status</div>
+      <div class="value" id="h-status"><span class="status-dot ok"></span>Online</div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     BODY: SIDEBAR + MAIN
+     ============================================================ -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-section">Views</div>
+    <div class="nav-item active" data-view="overview">
+      <span class="icon">&#9632;</span> Overview
+    </div>
+    <div class="nav-item" data-view="heatmap">
+      <span class="icon">&#9638;</span> Pair Heatmap
+    </div>
+    <div class="nav-item" data-view="correlation">
+      <span class="icon">&#9640;</span> Correlation Matrix
+    </div>
+    <div class="nav-item" data-view="pipeline">
+      <span class="icon">&#9654;</span> Promotion Pipeline
+    </div>
+    <div class="nav-item" data-view="live-monitor">
+      <span class="icon">&#9679;</span> Live Monitor
+    </div>
+
+    <div class="sidebar-section">Strategies (13)</div>
+    <div id="sidebar-strategies"></div>
+  </aside>
+
+  <!-- MAIN CONTENT AREA -->
+  <main id="main">
+
+    <!-- ======== VIEW 1: OVERVIEW ======== -->
+    <div class="view active" id="view-overview">
+      <!-- KPIs -->
+      <div class="kpi-row" id="overview-kpis">
+        <div class="kpi">
+          <div class="kpi-label">Total Paper Balance</div>
+          <div class="kpi-value" id="kpi-paper">--</div>
+          <div class="kpi-sub" id="kpi-paper-pnl"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total Live Capital</div>
+          <div class="kpi-value text-green" id="kpi-live">$0</div>
+          <div class="kpi-sub" id="kpi-live-sub"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Active Strategies</div>
+          <div class="kpi-value text-accent" id="kpi-active">--</div>
+          <div class="kpi-sub" id="kpi-active-sub"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total Trades</div>
+          <div class="kpi-value" id="kpi-trades">--</div>
+          <div class="kpi-sub" id="kpi-trades-sub"></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Best Strategy</div>
+          <div class="kpi-value text-green" id="kpi-best">--</div>
+          <div class="kpi-sub" id="kpi-best-sub"></div>
+        </div>
+      </div>
+
+      <!-- Equity curve -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Global Equity Curve</div>
+          <div class="card-subtitle" id="equity-updated"></div>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-equity"></canvas>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Leaderboard</div>
+          <div class="card-subtitle" id="lb-count"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>ID</th><th>Name</th><th>Phase</th><th>Balance</th>
+                <th>Trades</th><th>WR%</th><th>PF</th><th>Max DD</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="lb-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Open Positions -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Open Positions</div>
+          <div class="card-subtitle" id="pos-count">0 positions</div>
+        </div>
+        <div id="positions-container" style="display:flex;flex-direction:column;gap:8px">
+          <div class="text-dim text-center" style="padding:20px">No open positions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== VIEW 2: STRATEGY DETAIL ======== -->
+    <div class="view" id="view-strategy">
+      <div class="flex items-center justify-between mb-12">
+        <div>
+          <h2 id="sd-title" style="font-size:1.15rem;font-weight:700">Strategy Detail</h2>
+          <div class="text-dim" id="sd-subtitle"></div>
+        </div>
+        <div id="sd-phase-pill"></div>
+      </div>
+
+      <!-- Strategy KPIs -->
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Balance</div><div class="kpi-value" id="sd-balance">--</div></div>
+        <div class="kpi"><div class="kpi-label">Trades</div><div class="kpi-value" id="sd-trades">--</div></div>
+        <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-value" id="sd-wr">--</div></div>
+        <div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-value" id="sd-pf">--</div></div>
+        <div class="kpi"><div class="kpi-label">Max Drawdown</div><div class="kpi-value" id="sd-dd">--</div></div>
+      </div>
+
+      <div class="grid-2 mt-16">
+        <!-- Equity curve -->
+        <div class="card">
+          <div class="card-title mb-8">Equity Curve</div>
+          <div class="chart-container-sm">
+            <canvas id="chart-strat-equity"></canvas>
+          </div>
+        </div>
+        <!-- Trades by pair donut -->
+        <div class="card">
+          <div class="card-title mb-8">Trades by Pair</div>
+          <div class="chart-container-sm">
+            <canvas id="chart-strat-pairs"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Promotion progress -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Promotion Progress</div>
+        </div>
+        <div id="sd-promo-progress"></div>
+      </div>
+
+      <!-- Self-trainer params -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Self-Trainer Parameters</div>
+        </div>
+        <div id="sd-params" class="text-dim" style="font-size:.8rem">No parameters tuned yet.</div>
+      </div>
+
+      <!-- Trade log -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Trade Log</div>
+          <div class="card-subtitle" id="sd-log-count"></div>
+        </div>
+        <div class="table-wrap" style="max-height:360px;overflow-y:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>Pair</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="sd-log-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== VIEW 3: PAIR HEATMAP ======== -->
+    <div class="view" id="view-heatmap">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Strategy x Pair PnL Heatmap</div>
+          <div class="card-subtitle">Color intensity = cumulative PnL magnitude</div>
+        </div>
+        <div id="heatmap-container" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <!-- ======== VIEW 4: CORRELATION MATRIX ======== -->
+    <div class="view" id="view-correlation">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Pair Correlation Matrix</div>
+          <div class="card-subtitle" id="corr-subtitle"></div>
+        </div>
+        <div id="corr-container" style="overflow-x:auto"></div>
+      </div>
+      <div class="card mt-16" id="corr-breaks-card">
+        <div class="card-header">
+          <div class="card-title">Correlation Breaks</div>
+        </div>
+        <div id="corr-breaks" class="text-dim" style="font-size:.82rem">No breaks detected.</div>
+      </div>
+    </div>
+
+    <!-- ======== VIEW 5: PROMOTION PIPELINE ======== -->
+    <div class="view" id="view-pipeline">
+      <div class="card-title mb-12" style="font-size:1.1rem">Promotion Pipeline</div>
+      <div class="kanban" id="kanban-container">
+        <div class="kanban-col">
+          <div class="kanban-col-title" style="color:var(--blue)">PAPER</div>
+          <div id="kanban-paper"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-title" style="color:var(--yellow)">SHADOW</div>
+          <div id="kanban-shadow"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-title" style="color:var(--green)">LIVE</div>
+          <div id="kanban-live"></div>
+        </div>
+      </div>
+      <!-- Promotion history -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <div class="card-title">Promotion / Demotion History</div>
+        </div>
+        <div id="promo-history" class="text-dim" style="font-size:.82rem">No events yet.</div>
+      </div>
+    </div>
+
+    <!-- ======== VIEW 6: LIVE MONITOR ======== -->
+    <div class="view" id="view-live-monitor">
+      <div class="card-title mb-12" style="font-size:1.1rem">Live Monitor</div>
+      <div id="live-content">
+        <div class="live-empty">
+          <div class="icon-big">&#9679;</div>
+          <div>No strategies promoted to LIVE yet</div>
+          <div style="font-size:.75rem">Strategies will appear here once they pass the promotion pipeline</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer id="footer">
+  <div class="footer-item">
+    <span class="status-dot ok" id="f-cb-dot"></span>
+    <span>CB:</span>
+    <span id="f-cb-status">OK</span>
+  </div>
+  <div class="footer-item">
+    <span>Regime:</span>
+    <span id="f-regime">--</span>
+  </div>
+  <div class="footer-item">
+    <span>Coordinator:</span>
+    <span id="f-coordinator">--</span>
+  </div>
+  <div class="footer-item" style="margin-left:auto">
+    <span class="text-muted" id="f-last-update">Last update: --</span>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+(function() {
+'use strict';
+
+/* ----- State ----- */
+const API = window.location.origin;
+let currentView = 'overview';
+let selectedStrategyId = null;
+let leaderboardData = [];
+let portfolioData = {};
+let equityHistory = [];       // [{ts, balance}]
+let stratEquityHistory = [];  // per-strategy
+let charts = {};
+let pollTimers = {};
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function switchView(viewId, stratId) {
+  currentView = viewId;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById('view-' + viewId);
+  if (target) target.classList.add('active');
+
+  // Sidebar highlight
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.querySelector(`.nav-item[data-view="${viewId}"]`);
+  if (navEl) navEl.classList.add('active');
+
+  document.querySelectorAll('.strat-item').forEach(s => s.classList.remove('active'));
+  if (stratId) {
+    const stratEl = document.querySelector(`.strat-item[data-id="${stratId}"]`);
+    if (stratEl) stratEl.classList.add('active');
+  }
+
+  if (viewId === 'strategy' && stratId) {
+    selectedStrategyId = stratId;
+    fetchStrategyDetail(stratId);
+  } else if (viewId === 'heatmap') {
+    fetchHeatmap();
+  } else if (viewId === 'correlation') {
+    fetchCorrelation();
+  } else if (viewId === 'pipeline') {
+    fetchPipeline();
+  } else if (viewId === 'live-monitor') {
+    fetchLiveMonitor();
+  }
+}
+
+// Nav clicks
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => switchView(el.dataset.view));
+});
+
+/* ============================================================
+   API HELPERS
+   ============================================================ */
+async function apiFetch(path) {
+  try {
+    const res = await fetch(API + path);
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn('API error:', path, e.message);
+    return null;
+  }
+}
+
+/* ============================================================
+   DATA FETCHING & RENDERING
+   ============================================================ */
+
+// --- Main status poll (10s) ---
+async function fetchStatus() {
+  const data = await apiFetch('/tournament/status');
+  if (!data) return;
+
+  portfolioData = data.portfolio || {};
+  leaderboardData = data.leaderboard || [];
+
+  // Header
+  const paperTotal = portfolioData.paper_total || 0;
+  const paperInitial = portfolioData.paper_initial || 13000;
+  const pnl = paperTotal - paperInitial;
+  const pnlPct = paperInitial > 0 ? (pnl / paperInitial * 100) : 0;
+  document.getElementById('h-portfolio').textContent = '$' + fmt(paperTotal);
+  document.getElementById('h-portfolio').className = 'value ' + (pnl >= 0 ? 'positive' : 'negative');
+
+  // Track equity history
+  equityHistory.push({ ts: Date.now(), balance: paperTotal });
+  if (equityHistory.length > 500) equityHistory.shift();
+
+  // Footer: circuit breaker
+  const cb = data.circuit_breaker || {};
+  const cbPaper = cb.paper || {};
+  const cbLive = cb.live || {};
+  const cbTriggered = cbPaper.triggered || cbLive.triggered;
+  const cbDot = document.getElementById('f-cb-dot');
+  cbDot.className = 'status-dot ' + (cbTriggered ? 'err' : 'ok');
+  document.getElementById('f-cb-status').textContent = cbTriggered
+    ? (cbPaper.triggered ? 'PAPER HALT' : 'LIVE HALT')
+    : 'OK';
+
+  // Status indicator
+  const hStatus = document.getElementById('h-status');
+  if (data.paused) {
+    hStatus.innerHTML = '<span class="status-dot warn"></span>Paused';
+  } else if (cbTriggered) {
+    hStatus.innerHTML = '<span class="status-dot err"></span>CB Tripped';
+  } else {
+    hStatus.innerHTML = '<span class="status-dot ok"></span>Online';
+  }
+
+  // Update sidebar strategies
+  renderSidebarStrategies(leaderboardData);
+
+  // Update overview if visible
+  if (currentView === 'overview') {
+    renderOverview(leaderboardData, portfolioData);
+  }
+
+  document.getElementById('f-last-update').textContent = 'Last update: ' + new Date().toLocaleTimeString();
+}
+
+// --- Live capital ---
+async function fetchLiveCapital() {
+  const data = await apiFetch('/live/capital');
+  if (data) {
+    document.getElementById('h-live-capital').textContent = '$' + fmt(data.total_live_capital || 0);
+  }
+}
+
+// --- BTC price ---
+async function fetchBtcPrice() {
+  const data = await apiFetch('/pairs/BTCUSDT/price');
+  if (data && data.price) {
+    document.getElementById('h-btc').textContent = '$' + Number(data.price).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+}
+
+// --- Regime ---
+async function fetchRegime() {
+  const data = await apiFetch('/tournament/regime');
+  if (data) {
+    const regimes = Object.entries(data).map(([pair, info]) => {
+      const r = (info && info.regime) ? info.regime : '?';
+      return pair.replace('USDT','') + ':' + r;
+    });
+    document.getElementById('f-regime').textContent = regimes.slice(0,4).join(' | ');
+  }
+}
+
+// --- Coordinator ---
+async function fetchCoordinator() {
+  const data = await apiFetch('/tournament/coordinator');
+  if (data) {
+    document.getElementById('f-coordinator').textContent = data.last_run
+      ? timeAgo(new Date(data.last_run))
+      : 'Never';
+  }
+}
+
+// --- Open positions (5s) ---
+async function fetchPositions() {
+  if (currentView !== 'overview') return;
+  const positions = [];
+  for (const s of leaderboardData) {
+    if (s.open_position) {
+      positions.push({ ...s.open_position, strategy_id: s.id, strategy_name: s.name, phase: s.phase });
+    }
+  }
+  renderPositions(positions);
+}
+
+/* ============================================================
+   RENDERERS
+   ============================================================ */
+
+function renderSidebarStrategies(strategies) {
+  const container = document.getElementById('sidebar-strategies');
+  let html = '';
+  for (const s of strategies) {
+    const phase = s.is_eliminated ? 'ELIMINATED' : (s.is_paused ? 'PAUSED' : s.phase);
+    const active = selectedStrategyId === s.id && currentView === 'strategy' ? ' active' : '';
+    html += `<div class="strat-item${active}" data-id="${s.id}" onclick="window._selectStrategy('${s.id}')">
+      <span class="strat-id font-mono">${s.id}</span>
+      <span class="strat-name truncate">${s.name}</span>
+      <span class="pill pill-${phase}">${phase}</span>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderOverview(lb, portfolio) {
+  // KPIs
+  const paperTotal = portfolio.paper_total || 0;
+  const paperInitial = portfolio.paper_initial || 13000;
+  const pnl = paperTotal - paperInitial;
+  const pnlPct = paperInitial > 0 ? (pnl / paperInitial * 100) : 0;
+  document.getElementById('kpi-paper').textContent = '$' + fmt(paperTotal);
+  document.getElementById('kpi-paper').className = 'kpi-value ' + (pnl >= 0 ? 'text-green' : 'text-red');
+  document.getElementById('kpi-paper-pnl').textContent = (pnl >= 0 ? '+' : '') + '$' + fmt(pnl) + ' (' + pnlPct.toFixed(1) + '%)';
+  document.getElementById('kpi-paper-pnl').className = 'kpi-sub ' + (pnl >= 0 ? 'text-green' : 'text-red');
+
+  document.getElementById('kpi-live').textContent = '$' + fmt(portfolio.live_total || 0);
+  document.getElementById('kpi-live-sub').textContent = (portfolio.strategies_live || 0) + ' live strategies';
+
+  const active = portfolio.strategies_active || 0;
+  document.getElementById('kpi-active').textContent = active;
+  document.getElementById('kpi-active-sub').textContent = (portfolio.strategies_paused || 0) + ' paused, ' + (portfolio.strategies_eliminated || 0) + ' eliminated';
+
+  const totalTrades = lb.reduce((sum, s) => sum + (s.trades || 0), 0);
+  const totalWins = lb.reduce((sum, s) => sum + Math.round((s.win_rate || 0) / 100 * (s.trades || 0)), 0);
+  document.getElementById('kpi-trades').textContent = totalTrades;
+  document.getElementById('kpi-trades-sub').textContent = totalTrades > 0 ? 'Avg WR: ' + (totalWins / Math.max(totalTrades, 1) * 100).toFixed(1) + '%' : '';
+
+  // Best strategy
+  const ranked = lb.filter(s => !s.is_eliminated && s.trades > 0);
+  if (ranked.length > 0) {
+    const best = ranked[0];
+    document.getElementById('kpi-best').textContent = best.name;
+    document.getElementById('kpi-best-sub').textContent = 'PF: ' + best.profit_factor + ' | WR: ' + best.win_rate + '%';
+  }
+
+  // Leaderboard table
+  let lbHtml = '';
+  lb.forEach((s, i) => {
+    const phase = s.is_eliminated ? 'ELIMINATED' : (s.is_paused ? 'PAUSED' : s.phase);
+    const rowClass = s.is_eliminated ? ' class="eliminated"' : '';
+    const statusText = s.is_eliminated ? 'Eliminated' : (s.is_paused ? 'Paused' : (s.ready_to_rank ? 'Active' : 'Warming'));
+    lbHtml += `<tr${rowClass} style="cursor:pointer" onclick="window._selectStrategy('${s.id}')">
+      <td>${i + 1}</td>
+      <td class="font-mono">${s.id}</td>
+      <td>${s.name}</td>
+      <td><span class="pill pill-${phase}">${phase}</span></td>
+      <td class="font-mono ${s.balance >= 1000 ? 'text-green' : 'text-red'}">$${fmt(s.balance)}</td>
+      <td>${s.trades}</td>
+      <td>${s.win_rate}%</td>
+      <td class="font-mono">${s.profit_factor}</td>
+      <td>${(s.max_drawdown * 100).toFixed(1)}%</td>
+      <td>${statusText}</td>
+    </tr>`;
+  });
+  document.getElementById('lb-body').innerHTML = lbHtml;
+  document.getElementById('lb-count').textContent = lb.length + ' strategies';
+
+  // Equity chart
+  renderEquityChart();
+}
+
+function renderEquityChart() {
+  if (equityHistory.length < 2) return;
+  const ctx = document.getElementById('chart-equity');
+  if (!ctx) return;
+
+  const labels = equityHistory.map(e => new Date(e.ts).toLocaleTimeString());
+  const values = equityHistory.map(e => e.balance);
+
+  if (charts.equity) {
+    charts.equity.data.labels = labels;
+    charts.equity.data.datasets[0].data = values;
+    charts.equity.update('none');
+  } else {
+    charts.equity = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Portfolio Balance',
+          data: values,
+          borderColor: '#818cf8',
+          backgroundColor: 'rgba(129,140,248,.1)',
+          fill: true,
+          tension: .3,
+          pointRadius: 0,
+          borderWidth: 2,
+        }]
+      },
+      options: chartOpts('$')
+    });
+  }
+}
+
+function renderPositions(positions) {
+  const container = document.getElementById('positions-container');
+  document.getElementById('pos-count').textContent = positions.length + ' positions';
+
+  if (positions.length === 0) {
+    container.innerHTML = '<div class="text-dim text-center" style="padding:20px">No open positions</div>';
+    return;
+  }
+
+  let html = '';
+  for (const p of positions) {
+    const dir = p.direction || 'LONG';
+    const pair = p.pair || '?';
+    const entry = p.entry_price || 0;
+    const tp = p.tp || 0;
+    const sl = p.sl || 0;
+    const entryTime = p.entry_time ? new Date(p.entry_time) : null;
+    const duration = entryTime ? timeAgo(entryTime) : '--';
+
+    // TP/SL progress (approximate, we don't have current price per position in this data)
+    const range = Math.abs(tp - sl);
+    const tpPct = range > 0 ? Math.min(100, Math.max(0, Math.abs(entry - sl) / range * 100)) : 50;
+
+    html += `<div class="pos-card">
+      <div class="pos-dir ${dir}">${dir}</div>
+      <div>
+        <div style="font-weight:600">${p.strategy_name || p.strategy_id} <span class="text-dim">/ ${pair}</span></div>
+        <div class="text-dim" style="font-size:.75rem;margin-top:3px">
+          Entry: $${fmt(entry)} | TP: $${fmt(tp)} | SL: $${fmt(sl)}
+        </div>
+        <div class="progress-bar mt-8" style="width:200px" data-tooltip="Distance to TP/SL">
+          <div class="fill green" style="width:${tpPct}%"></div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="pill pill-${p.phase || 'PAPER'}">${p.phase || 'PAPER'}</div>
+        <div class="text-dim" style="font-size:.72rem;margin-top:4px">${duration}</div>
+      </div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+/* ============================================================
+   VIEW 2: STRATEGY DETAIL
+   ============================================================ */
+async function fetchStrategyDetail(id) {
+  const data = await apiFetch('/tournament/strategy/' + id);
+  if (!data) return;
+
+  const phase = data.is_eliminated ? 'ELIMINATED' : (data.is_paused ? 'PAUSED' : data.phase);
+  document.getElementById('sd-title').textContent = data.name || id;
+  document.getElementById('sd-subtitle').textContent = id + ' | ' + (data.timeframe || '--') + ' | ' + data.leverage + 'x leverage';
+  document.getElementById('sd-phase-pill').innerHTML = `<span class="pill pill-${phase}" style="font-size:.8rem;padding:3px 12px">${phase}</span>`;
+
+  document.getElementById('sd-balance').textContent = '$' + fmt(data.balance);
+  document.getElementById('sd-balance').className = 'kpi-value ' + (data.balance >= 1000 ? 'text-green' : 'text-red');
+  document.getElementById('sd-trades').textContent = data.trades;
+  document.getElementById('sd-wr').textContent = data.win_rate + '%';
+  document.getElementById('sd-wr').className = 'kpi-value ' + (data.win_rate >= 55 ? 'text-green' : (data.win_rate < 45 ? 'text-red' : ''));
+  document.getElementById('sd-pf').textContent = data.profit_factor;
+  document.getElementById('sd-pf').className = 'kpi-value ' + (data.profit_factor >= 1.5 ? 'text-green' : (data.profit_factor < 1 ? 'text-red' : ''));
+  document.getElementById('sd-dd').textContent = (data.max_drawdown * 100).toFixed(1) + '%';
+  document.getElementById('sd-dd').className = 'kpi-value ' + (data.max_drawdown > 0.1 ? 'text-red' : 'text-green');
+
+  // Trade log
+  const closedTrades = (data.trade_log || []).filter(t => t.action === 'CLOSE');
+  document.getElementById('sd-log-count').textContent = closedTrades.length + ' trades';
+
+  let logHtml = '';
+  for (const t of closedTrades.slice().reverse()) {
+    const pnlClass = (t.pnl_net || 0) >= 0 ? 'text-green' : 'text-red';
+    logHtml += `<tr>
+      <td class="font-mono">${formatTS(t.ts)}</td>
+      <td>${t.pair || '--'}</td>
+      <td><span class="pos-dir ${t.direction}" style="font-size:.7rem;padding:2px 6px">${t.direction}</span></td>
+      <td class="font-mono">$${fmt(t.entry_price || t.price)}</td>
+      <td class="font-mono">$${fmt(t.price)}</td>
+      <td class="font-mono ${pnlClass}">${(t.pnl_net >= 0 ? '+' : '')}$${fmt(t.pnl_net)}</td>
+      <td>${t.reason || '--'}</td>
+    </tr>`;
+  }
+  document.getElementById('sd-log-body').innerHTML = logHtml || '<tr><td colspan="7" class="text-dim text-center">No trades yet</td></tr>';
+
+  // Equity curve from trade log
+  renderStratEquityChart(data.trade_log || [], data.balance);
+
+  // Trades by pair donut
+  renderStratPairsChart(closedTrades);
+
+  // Self-trainer params
+  const params = data.params || {};
+  if (Object.keys(params).length > 0) {
+    let pHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    for (const [k, v] of Object.entries(params)) {
+      pHtml += `<div style="background:rgba(15,23,42,.5);padding:8px 10px;border-radius:6px">
+        <div class="text-muted" style="font-size:.68rem;text-transform:uppercase">${k}</div>
+        <div class="font-mono" style="font-size:.85rem">${typeof v === 'number' ? v.toFixed(4) : v}</div>
+      </div>`;
+    }
+    pHtml += '</div>';
+    document.getElementById('sd-params').innerHTML = pHtml;
+  } else {
+    document.getElementById('sd-params').innerHTML = '<span class="text-dim">No parameters tuned yet.</span>';
+  }
+
+  // Promotion progress
+  renderPromoProgress(data);
+}
+
+function renderStratEquityChart(tradeLog, currentBalance) {
+  const closes = tradeLog.filter(t => t.action === 'CLOSE');
+  if (closes.length === 0) {
+    if (charts.stratEquity) { charts.stratEquity.destroy(); charts.stratEquity = null; }
+    return;
+  }
+
+  const labels = closes.map(t => formatTS(t.ts));
+  const values = closes.map(t => t.balance);
+
+  const ctx = document.getElementById('chart-strat-equity');
+  if (charts.stratEquity) charts.stratEquity.destroy();
+
+  charts.stratEquity = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Balance',
+        data: values,
+        borderColor: '#818cf8',
+        backgroundColor: 'rgba(129,140,248,.08)',
+        fill: true,
+        tension: .3,
+        pointRadius: 1,
+        borderWidth: 2,
+      }]
+    },
+    options: chartOpts('$')
+  });
+}
+
+function renderStratPairsChart(closedTrades) {
+  const pairCounts = {};
+  for (const t of closedTrades) {
+    const p = t.pair || 'unknown';
+    pairCounts[p] = (pairCounts[p] || 0) + 1;
+  }
+
+  const labels = Object.keys(pairCounts);
+  const values = Object.values(pairCounts);
+  const colors = ['#818cf8','#34d399','#f87171','#fbbf24','#60a5fa','#a78bfa','#fb923c','#22d3ee'];
+
+  const ctx = document.getElementById('chart-strat-pairs');
+  if (charts.stratPairs) charts.stratPairs.destroy();
+
+  if (labels.length === 0) return;
+
+  charts.stratPairs = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, labels.length),
+        borderColor: '#1e293b',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e2e8f0', font: { size: 11 }, padding: 12 } }
+      }
+    }
+  });
+}
+
+function renderPromoProgress(data) {
+  const container = document.getElementById('sd-promo-progress');
+  const phase = data.phase;
+
+  // Criteria
+  const criteria = [
+    { label: 'Trades', current: data.trades, target: 100, unit: '' },
+    { label: 'Win Rate', current: data.win_rate, target: 55, unit: '%' },
+    { label: 'Profit Factor', current: data.profit_factor, target: 1.5, unit: '' },
+    { label: 'Max DD', current: data.max_drawdown * 100, target: 15, unit: '%', inverse: true },
+  ];
+
+  let html = `<div class="flex items-center gap-12 mb-12">
+    <span class="pill pill-PAPER" style="opacity:${phase==='PAPER'?1:.4}">PAPER</span>
+    <span style="color:var(--text-muted)">&#8594;</span>
+    <span class="pill pill-SHADOW" style="opacity:${phase==='SHADOW'?1:.4}">SHADOW</span>
+    <span style="color:var(--text-muted)">&#8594;</span>
+    <span class="pill pill-LIVE" style="opacity:${phase==='LIVE'?1:.4}">LIVE</span>
+  </div>`;
+
+  if (phase === 'PAPER') {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">';
+    for (const c of criteria) {
+      let pct;
+      if (c.inverse) {
+        pct = c.current <= c.target ? 100 : Math.max(0, (1 - (c.current - c.target) / c.target) * 100);
+      } else {
+        pct = Math.min(100, (c.current / c.target) * 100);
+      }
+      const met = pct >= 100;
+      html += `<div style="background:rgba(15,23,42,.5);padding:10px 12px;border-radius:6px">
+        <div class="flex justify-between" style="font-size:.75rem;margin-bottom:4px">
+          <span>${c.label}</span>
+          <span class="${met ? 'text-green' : 'text-yellow'}">${c.current}${c.unit} / ${c.target}${c.unit}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="fill ${met ? 'green' : 'yellow'}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+  } else if (phase === 'SHADOW') {
+    html += '<div class="text-dim">In shadow phase. Monitoring for errors before live promotion.</div>';
+  } else if (phase === 'LIVE') {
+    html += '<div class="text-green">Strategy is LIVE and trading with real capital.</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+/* ============================================================
+   VIEW 3: PAIR HEATMAP
+   ============================================================ */
+async function fetchHeatmap() {
+  const [heatmap, lbRes] = await Promise.all([
+    apiFetch('/pairs/heatmap'),
+    apiFetch('/tournament/leaderboard')
+  ]);
+
+  if (!heatmap) return;
+  const lb = lbRes ? lbRes.leaderboard : leaderboardData;
+
+  const stratIds = Object.keys(heatmap);
+  if (stratIds.length === 0) {
+    document.getElementById('heatmap-container').innerHTML = '<div class="text-dim text-center" style="padding:40px">No heatmap data available yet</div>';
+    return;
+  }
+
+  // Get all pairs
+  const pairsSet = new Set();
+  for (const sid of stratIds) {
+    for (const p of Object.keys(heatmap[sid])) pairsSet.add(p);
+  }
+  const pairs = Array.from(pairsSet);
+
+  // Find min/max for color scaling
+  let allVals = [];
+  for (const sid of stratIds) {
+    for (const p of pairs) {
+      allVals.push(heatmap[sid][p] || 0);
+    }
+  }
+  const maxAbs = Math.max(Math.abs(Math.min(...allVals)), Math.abs(Math.max(...allVals)), 1);
+
+  // Build grid
+  const cols = stratIds.length + 2; // header col + strats + row total
+  let html = `<div class="heatmap-grid" style="grid-template-columns: 100px repeat(${stratIds.length}, 1fr) 80px;">`;
+
+  // Header row
+  html += '<div class="heatmap-cell heatmap-header"></div>';
+  for (const sid of stratIds) {
+    const shortId = sid.replace('g','G');
+    html += `<div class="heatmap-cell heatmap-header" style="font-size:.65rem;writing-mode:vertical-rl;transform:rotate(180deg);height:60px">${shortId}</div>`;
+  }
+  html += '<div class="heatmap-cell heatmap-header">Total</div>';
+
+  // Data rows
+  for (const pair of pairs) {
+    html += `<div class="heatmap-cell heatmap-header">${pair.replace('USDT','')}</div>`;
+    let rowTotal = 0;
+    for (const sid of stratIds) {
+      const val = heatmap[sid][pair] || 0;
+      rowTotal += val;
+      const color = heatmapColor(val, maxAbs);
+      html += `<div class="heatmap-cell" style="background:${color}" data-tooltip="${sid}: $${fmt(val)}">${val !== 0 ? (val > 0 ? '+' : '') + fmt(val) : '-'}</div>`;
+    }
+    const rtColor = heatmapColor(rowTotal, maxAbs * stratIds.length * 0.3);
+    html += `<div class="heatmap-cell" style="background:${rtColor};font-weight:700">${rowTotal !== 0 ? (rowTotal > 0 ? '+' : '') + fmt(rowTotal) : '-'}</div>`;
+  }
+
+  // Column totals row
+  html += '<div class="heatmap-cell heatmap-header">Total</div>';
+  let grandTotal = 0;
+  for (const sid of stratIds) {
+    let colTotal = 0;
+    for (const p of pairs) colTotal += (heatmap[sid][p] || 0);
+    grandTotal += colTotal;
+    const ctColor = heatmapColor(colTotal, maxAbs * pairs.length * 0.3);
+    html += `<div class="heatmap-cell" style="background:${ctColor};font-weight:700">${colTotal !== 0 ? (colTotal > 0 ? '+' : '') + fmt(colTotal) : '-'}</div>`;
+  }
+  const gtColor = heatmapColor(grandTotal, maxAbs * stratIds.length);
+  html += `<div class="heatmap-cell" style="background:${gtColor};font-weight:700">${grandTotal !== 0 ? (grandTotal > 0 ? '+' : '') + fmt(grandTotal) : '-'}</div>`;
+  html += '</div>';
+
+  document.getElementById('heatmap-container').innerHTML = html;
+}
+
+function heatmapColor(val, maxAbs) {
+  if (val === 0) return 'rgba(51,65,85,.3)';
+  const intensity = Math.min(1, Math.abs(val) / Math.max(maxAbs, 1));
+  if (val > 0) {
+    return `rgba(52,211,153,${0.1 + intensity * 0.6})`;
+  } else {
+    return `rgba(248,113,113,${0.1 + intensity * 0.6})`;
+  }
+}
+
+/* ============================================================
+   VIEW 4: CORRELATION MATRIX
+   ============================================================ */
+async function fetchCorrelation() {
+  const data = await apiFetch('/pairs/correlation');
+  if (!data || !data.matrix) {
+    document.getElementById('corr-container').innerHTML = '<div class="text-dim text-center" style="padding:40px">No correlation data available yet</div>';
+    return;
+  }
+
+  const pairs = Object.keys(data.matrix);
+  if (pairs.length === 0) return;
+
+  document.getElementById('corr-subtitle').textContent = 'Avg: ' + (data.avg_correlation || 0).toFixed(4) + ' | Divergence Index: ' + (data.divergence_index || 0).toFixed(4);
+
+  // Build matrix grid
+  const cols = pairs.length + 1;
+  let html = `<div class="heatmap-grid" style="grid-template-columns: 90px repeat(${pairs.length}, 1fr);">`;
+
+  // Header
+  html += '<div class="heatmap-cell heatmap-header"></div>';
+  for (const p of pairs) {
+    html += `<div class="heatmap-cell heatmap-header" style="font-size:.7rem">${p.replace('USDT','')}</div>`;
+  }
+
+  // Rows
+  const breaks = data.breaks || [];
+  const breakPairs = new Set();
+  for (const b of breaks) {
+    breakPairs.add(b.pair_a + '|' + b.pair_b);
+    breakPairs.add(b.pair_b + '|' + b.pair_a);
+  }
+
+  for (const rowPair of pairs) {
+    html += `<div class="heatmap-cell heatmap-header">${rowPair.replace('USDT','')}</div>`;
+    for (const colPair of pairs) {
+      const val = data.matrix[rowPair][colPair];
+      const color = corrColor(val);
+      const isBreak = breakPairs.has(rowPair + '|' + colPair);
+      const breakClass = isBreak ? ' corr-alert' : '';
+      html += `<div class="heatmap-cell${breakClass}" style="background:${color}" data-tooltip="${rowPair.replace('USDT','')} / ${colPair.replace('USDT','')}: ${val.toFixed(4)}">${val.toFixed(2)}</div>`;
+    }
+  }
+  html += '</div>';
+
+  document.getElementById('corr-container').innerHTML = html;
+
+  // Breaks
+  if (breaks.length > 0) {
+    let bHtml = '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const b of breaks) {
+      bHtml += `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:6px;font-size:.78rem">
+        <span class="text-yellow" style="font-weight:600">${b.pair_a.replace('USDT','')} / ${b.pair_b.replace('USDT','')}</span>
+        <span class="text-dim">Corr: ${b.correlation.toFixed(4)} | Avg: ${b.avg.toFixed(4)} | Dev: ${b.deviation}x std</span>
+      </div>`;
+    }
+    bHtml += '</div>';
+    document.getElementById('corr-breaks').innerHTML = bHtml;
+  } else {
+    document.getElementById('corr-breaks').innerHTML = '<span class="text-dim">No correlation breaks detected.</span>';
+  }
+}
+
+function corrColor(val) {
+  if (val >= 0) {
+    const i = Math.min(1, val);
+    return `rgba(96,165,250,${0.05 + i * 0.55})`;
+  } else {
+    const i = Math.min(1, Math.abs(val));
+    return `rgba(248,113,113,${0.05 + i * 0.55})`;
+  }
+}
+
+/* ============================================================
+   VIEW 5: PROMOTION PIPELINE
+   ============================================================ */
+async function fetchPipeline() {
+  const [pipelineData, lbRes, historyData] = await Promise.all([
+    apiFetch('/promotion/pipeline'),
+    apiFetch('/tournament/leaderboard'),
+    apiFetch('/promotion/history')
+  ]);
+
+  const lb = lbRes ? lbRes.leaderboard : leaderboardData;
+  const pipeline = pipelineData || { strategies: {}, history: [] };
+
+  // Group strategies by phase
+  const groups = { PAPER: [], SHADOW: [], LIVE: [] };
+  for (const s of lb) {
+    const phase = s.is_eliminated ? null : (s.is_paused ? null : s.phase);
+    if (phase && groups[phase]) {
+      groups[phase].push(s);
+    }
+  }
+
+  for (const phase of ['PAPER', 'SHADOW', 'LIVE']) {
+    const container = document.getElementById('kanban-' + phase.toLowerCase());
+    if (groups[phase].length === 0) {
+      container.innerHTML = '<div class="text-dim text-center" style="padding:16px;font-size:.75rem">No strategies</div>';
+      continue;
+    }
+
+    let html = '';
+    for (const s of groups[phase]) {
+      // Promotion progress
+      let progPct = 0;
+      if (phase === 'PAPER') {
+        const criteria = [
+          Math.min(1, s.trades / 100),
+          Math.min(1, s.win_rate / 55),
+          Math.min(1, s.profit_factor / 1.5),
+          s.max_drawdown < 0.15 ? 1 : 0,
+        ];
+        progPct = Math.round(criteria.reduce((a,b) => a+b, 0) / criteria.length * 100);
+      } else if (phase === 'SHADOW') {
+        progPct = 50; // approximate
+      } else {
+        progPct = 100;
+      }
+
+      html += `<div class="kanban-card">
+        <div class="kc-header">
+          <span class="kc-name">${s.name}</span>
+          <span class="font-mono text-dim" style="font-size:.65rem">${s.id}</span>
+        </div>
+        <div class="kc-stats">
+          <span>Bal: $${fmt(s.balance)}</span>
+          <span>Trades: ${s.trades}</span>
+          <span>WR: ${s.win_rate}%</span>
+          <span>PF: ${s.profit_factor}</span>
+        </div>
+        <div class="progress-bar mt-8">
+          <div class="fill ${phase === 'PAPER' ? 'blue' : (phase === 'SHADOW' ? 'yellow' : 'green')}" style="width:${progPct}%"></div>
+        </div>
+        <div class="text-dim text-right" style="font-size:.65rem;margin-top:2px">${progPct}% to next</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  }
+
+  // History
+  const history = historyData || pipeline.history || [];
+  if (history.length > 0) {
+    let hHtml = '<div style="display:flex;flex-direction:column;gap:4px">';
+    for (const h of history.slice().reverse().slice(0, 20)) {
+      const actionColor = h.action.includes('DEMOTE') ? 'text-red' : 'text-green';
+      hHtml += `<div style="display:flex;align-items:center;gap:8px;font-size:.78rem;padding:4px 0;border-bottom:1px solid rgba(51,65,85,.3)">
+        <span class="font-mono text-dim" style="min-width:140px">${formatTS(h.ts)}</span>
+        <span class="font-mono" style="min-width:40px">${h.id}</span>
+        <span class="${actionColor}" style="font-weight:600">${h.action}</span>
+        <span class="text-dim">${h.reason || ''}</span>
+      </div>`;
+    }
+    hHtml += '</div>';
+    document.getElementById('promo-history').innerHTML = hHtml;
+  } else {
+    document.getElementById('promo-history').innerHTML = '<span class="text-dim">No promotion events yet.</span>';
+  }
+}
+
+/* ============================================================
+   VIEW 6: LIVE MONITOR
+   ============================================================ */
+async function fetchLiveMonitor() {
+  const [lbRes, capitalData, cbData, posData] = await Promise.all([
+    apiFetch('/tournament/leaderboard'),
+    apiFetch('/live/capital'),
+    apiFetch('/tournament/circuit-breaker'),
+    apiFetch('/live/positions')
+  ]);
+
+  const lb = lbRes ? lbRes.leaderboard : leaderboardData;
+  const liveStrats = lb.filter(s => s.phase === 'LIVE' && !s.is_eliminated);
+  const container = document.getElementById('live-content');
+
+  if (liveStrats.length === 0) {
+    container.innerHTML = `<div class="live-empty">
+      <div class="icon-big">&#9679;</div>
+      <div>No strategies promoted to LIVE yet</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Strategies will appear here once they pass the promotion pipeline</div>
+    </div>`;
+    return;
+  }
+
+  const totalLive = capitalData ? capitalData.total_live_capital : 0;
+  const cb = cbData || { paper: {}, live: {} };
+  const positions = posData || [];
+
+  let html = '';
+
+  // Capital bar
+  html += `<div class="card mb-12">
+    <div class="card-header">
+      <div class="card-title">Live Capital</div>
+      <div class="card-subtitle">$${fmt(totalLive)} deployed</div>
+    </div>
+    <div class="chart-container-sm">
+      <canvas id="chart-live-capital"></canvas>
+    </div>
+  </div>`;
+
+  // Circuit breaker proximity
+  const cbLive = cb.live || {};
+  const cbProx = cbLive.triggered ? 100 : Math.min(100, Math.abs(cbLive.daily_pnl || 0) / Math.max(totalLive * 0.05, 1) * 100);
+  html += `<div class="card mb-12">
+    <div class="card-header">
+      <div class="card-title">Circuit Breaker Proximity</div>
+      <div class="card-subtitle ${cbLive.triggered ? 'text-red' : ''}">${cbLive.triggered ? 'TRIGGERED: ' + cbLive.reason : 'Normal'}</div>
+    </div>
+    <div class="progress-bar" style="height:12px">
+      <div class="fill ${cbProx > 80 ? 'red' : (cbProx > 50 ? 'yellow' : 'green')}" style="width:${cbProx}%"></div>
+    </div>
+    <div class="text-dim" style="font-size:.72rem;margin-top:4px">Daily P&L: $${fmt(cbLive.daily_pnl || 0)} | Threshold: -5%</div>
+  </div>`;
+
+  // Live strategies
+  html += '<div style="display:flex;flex-direction:column;gap:10px">';
+  for (const s of liveStrats) {
+    const pnl = s.balance - 1000;
+    const pnlClass = pnl >= 0 ? 'text-green' : 'text-red';
+    const hasPos = s.open_position != null;
+
+    html += `<div class="card">
+      <div class="flex justify-between items-center mb-8">
+        <div>
+          <span style="font-weight:700">${s.name}</span>
+          <span class="text-dim font-mono" style="font-size:.72rem;margin-left:6px">${s.id}</span>
+          ${hasPos ? '<span class="pill pill-LIVE" style="margin-left:8px">IN POSITION</span>' : ''}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="window._killSwitch('${s.id}')">Kill Switch</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;font-size:.8rem">
+        <div><div class="text-muted" style="font-size:.65rem">BALANCE</div><div class="font-mono">$${fmt(s.balance)}</div></div>
+        <div><div class="text-muted" style="font-size:.65rem">LIVE BAL</div><div class="font-mono text-green">$${fmt(s.live_balance)}</div></div>
+        <div><div class="text-muted" style="font-size:.65rem">P&L</div><div class="font-mono ${pnlClass}">${pnl >= 0 ? '+' : ''}$${fmt(pnl)}</div></div>
+        <div><div class="text-muted" style="font-size:.65rem">WIN RATE</div><div>${s.win_rate}%</div></div>
+        <div><div class="text-muted" style="font-size:.65rem">PROFIT FACTOR</div><div>${s.profit_factor}</div></div>
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+
+  container.innerHTML = html;
+
+  // Render capital bar chart
+  setTimeout(() => {
+    const ctx = document.getElementById('chart-live-capital');
+    if (!ctx) return;
+    if (charts.liveCapital) charts.liveCapital.destroy();
+
+    const labels = liveStrats.map(s => s.id);
+    const balances = liveStrats.map(s => s.live_balance);
+    charts.liveCapital = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Live Capital',
+          data: balances,
+          backgroundColor: 'rgba(52,211,153,.5)',
+          borderColor: '#34d399',
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(51,65,85,.3)' } },
+          y: { ticks: { color: '#94a3b8', callback: v => '$' + v }, grid: { color: 'rgba(51,65,85,.3)' } }
+        }
+      }
+    });
+  }, 50);
+}
+
+// Kill switch
+window._killSwitch = async function(id) {
+  if (!confirm('Demote ' + id + ' from LIVE to PAPER? This will stop all live trading for this strategy.')) return;
+  const res = await fetch(API + '/promotion/strategy/' + id + '/demote', { method: 'POST' });
+  if (res.ok) {
+    fetchStatus();
+    fetchLiveMonitor();
+  } else {
+    alert('Failed to demote strategy');
+  }
+};
+
+// Strategy selection
+window._selectStrategy = function(id) {
+  switchView('strategy', id);
+};
+
+/* ============================================================
+   CHART HELPERS
+   ============================================================ */
+function chartOpts(prefix) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1e293b',
+        borderColor: '#334155',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        cornerRadius: 6,
+        padding: 10,
+        callbacks: {
+          label: function(ctx) { return (prefix || '') + fmt(ctx.parsed.y); }
+        }
+      }
+    },
+    scales: {
+      x: {
+        display: true,
+        ticks: { color: '#64748b', maxTicksLimit: 10, font: { size: 10 } },
+        grid: { color: 'rgba(51,65,85,.2)' }
+      },
+      y: {
+        display: true,
+        ticks: {
+          color: '#64748b',
+          font: { size: 10 },
+          callback: function(v) { return (prefix || '') + fmt(v); }
+        },
+        grid: { color: 'rgba(51,65,85,.2)' }
+      }
+    }
+  };
+}
+
+/* ============================================================
+   UTILITY FUNCTIONS
+   ============================================================ */
+function fmt(n) {
+  if (n == null || isNaN(n)) return '0.00';
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatTS(ts) {
+  if (!ts) return '--';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ts; }
+}
+
+function timeAgo(date) {
+  const now = new Date();
+  const diff = (now - date) / 1000;
+  if (diff < 60) return Math.round(diff) + 's ago';
+  if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.round(diff / 3600) + 'h ago';
+  return Math.round(diff / 86400) + 'd ago';
+}
+
+/* ============================================================
+   POLLING
+   ============================================================ */
+async function init() {
+  await fetchStatus();
+  await Promise.all([fetchLiveCapital(), fetchBtcPrice(), fetchRegime(), fetchCoordinator()]);
+  fetchPositions();
+}
+
+// Initial load
+init();
+
+// Main status: every 10s
+setInterval(fetchStatus, 10000);
+
+// Live capital, BTC price: every 10s
+setInterval(fetchLiveCapital, 10000);
+setInterval(fetchBtcPrice, 10000);
+
+// Regime & coordinator: every 30s
+setInterval(fetchRegime, 30000);
+setInterval(fetchCoordinator, 30000);
+
+// Open positions: every 5s
+setInterval(fetchPositions, 5000);
+
+// Refresh current view every 10s
+setInterval(() => {
+  if (currentView === 'strategy' && selectedStrategyId) {
+    fetchStrategyDetail(selectedStrategyId);
+  } else if (currentView === 'heatmap') {
+    fetchHeatmap();
+  } else if (currentView === 'correlation') {
+    fetchCorrelation();
+  } else if (currentView === 'pipeline') {
+    fetchPipeline();
+  } else if (currentView === 'live-monitor') {
+    fetchLiveMonitor();
+  }
+}, 10000);
+
+})();
+</script>
+</body>
+</html>

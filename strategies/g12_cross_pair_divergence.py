@@ -14,9 +14,12 @@ CONFIG = StrategyConfig(
     sl_pct=0.0032,
     cron_expr={"minute": "*/5"},
     regime_filter=["ANY"],
-    description="GOD 2 exclusive: mean reversion when altcoin diverges from BTC.",
+    description="GOD 2 exclusive: mean reversion when altcoin diverges from anchor pair.",
     timeout_minutes=120,
 )
+
+# Anchor pair: the most liquid pair in the tournament, used as reference for divergences
+ANCHOR_PAIR = "ORDIUSDT"
 
 
 class G12CrossPairDivergence(BaseStrategyV4):
@@ -25,45 +28,46 @@ class G12CrossPairDivergence(BaseStrategyV4):
         super().__init__(config=CONFIG, **kwargs)
 
     async def evaluate(self, pair: str, df=None) -> TradeSignal:
-        # This strategy only trades altcoins, not BTC itself
-        if pair == "BTCUSDT":
-            return TradeSignal("HOLD", False, 0.0, {}, "G-12 only trades altcoins", pair)
+        # This strategy doesn't trade the anchor pair itself
+        if pair == ANCHOR_PAIR:
+            return TradeSignal("HOLD", False, 0.0, {}, f"G-12 only trades pairs other than anchor {ANCHOR_PAIR}", pair)
 
         corr_data = get_correlation_matrix()
         matrix = corr_data.get("matrix", {})
 
-        if "BTCUSDT" not in matrix or pair not in matrix.get("BTCUSDT", {}):
+        if ANCHOR_PAIR not in matrix or pair not in matrix.get(ANCHOR_PAIR, {}):
             return TradeSignal("HOLD", False, 0.3, {}, "Correlation data unavailable", pair)
 
-        btc_corr = matrix["BTCUSDT"].get(pair, 0.5)
+        anchor_corr = matrix[ANCHOR_PAIR].get(pair, 0.5)
 
         # Get recent returns for both
-        btc_df = await fetch_ohlcv("BTCUSDT", "5m", limit=5)
+        anchor_df = await fetch_ohlcv(ANCHOR_PAIR, "5m", limit=5)
         alt_df = await fetch_ohlcv(pair, "5m", limit=5) if df is None else df
 
-        btc_ret = (btc_df.iloc[-1]["close"] - btc_df.iloc[0]["open"]) / btc_df.iloc[0]["open"] * 100
+        anchor_ret = (anchor_df.iloc[-1]["close"] - anchor_df.iloc[0]["open"]) / anchor_df.iloc[0]["open"] * 100
         alt_ret = (alt_df.iloc[-1]["close"] - alt_df.iloc[0]["open"]) / alt_df.iloc[0]["open"] * 100
-        divergence = alt_ret - btc_ret
+        divergence = alt_ret - anchor_ret
 
         signals = {
-            "btc_corr": round(btc_corr, 4),
-            "btc_ret": round(btc_ret, 4),
+            "anchor_pair": ANCHOR_PAIR,
+            "anchor_corr": round(anchor_corr, 4),
+            "anchor_ret": round(anchor_ret, 4),
             "alt_ret": round(alt_ret, 4),
             "divergence": round(divergence, 4),
         }
 
         # Only trade when correlation is normally high but currently diverging
-        if btc_corr < 0.6:
+        if anchor_corr < 0.6:
             return TradeSignal("HOLD", False, 0.3, signals, "Correlation too low to trade divergence", pair)
 
-        # Altcoin lagging BTC significantly → expect mean reversion (altcoin catches up)
-        if btc_ret > 0.3 and divergence < -0.5:
-            conf = min(0.88, 0.72 + abs(divergence) * 0.1 + btc_corr * 0.1)
-            return TradeSignal("LONG", True, conf, signals, f"{pair} lagging BTC by {divergence:.2f}%", pair)
+        # Altcoin lagging anchor significantly → expect mean reversion (altcoin catches up)
+        if anchor_ret > 0.3 and divergence < -0.5:
+            conf = min(0.88, 0.72 + abs(divergence) * 0.1 + anchor_corr * 0.1)
+            return TradeSignal("LONG", True, conf, signals, f"{pair} lagging {ANCHOR_PAIR} by {divergence:.2f}%", pair)
 
-        # Altcoin overperforming BTC significantly → expect mean reversion (altcoin pulls back)
-        if btc_ret < -0.3 and divergence > 0.5:
-            conf = min(0.88, 0.72 + abs(divergence) * 0.1 + btc_corr * 0.1)
-            return TradeSignal("SHORT", True, conf, signals, f"{pair} overperforming BTC by {divergence:.2f}%", pair)
+        # Altcoin overperforming anchor significantly → expect mean reversion (altcoin pulls back)
+        if anchor_ret < -0.3 and divergence > 0.5:
+            conf = min(0.88, 0.72 + abs(divergence) * 0.1 + anchor_corr * 0.1)
+            return TradeSignal("SHORT", True, conf, signals, f"{pair} overperforming {ANCHOR_PAIR} by {divergence:.2f}%", pair)
 
         return TradeSignal("HOLD", False, 0.35, signals, "No significant cross-pair divergence", pair)

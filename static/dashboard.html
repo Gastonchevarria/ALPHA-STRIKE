@@ -335,7 +335,7 @@ tbody tr.eliminated{opacity:.45}
           <table>
             <thead>
               <tr>
-                <th>#</th><th>ID</th><th>Name</th><th>Phase</th><th>Balance</th>
+                <th>#</th><th>ID</th><th>Name</th><th>Phase</th><th>Trading</th><th>Balance</th>
                 <th>Trades</th><th>WR%</th><th>PF</th><th>Max DD</th><th>Status</th>
               </tr>
             </thead>
@@ -751,11 +751,16 @@ function renderOverview(lb, portfolio) {
     const phase = s.is_eliminated ? 'ELIMINATED' : (s.is_paused ? 'PAUSED' : s.phase);
     const rowClass = s.is_eliminated ? ' class="eliminated"' : '';
     const statusText = s.is_eliminated ? 'Eliminated' : (s.is_paused ? 'Paused' : (s.ready_to_rank ? 'Active' : 'Warming'));
+    const openPos = s.open_position;
+    const tradingCell = openPos
+      ? `<span class="pos-dir ${openPos.direction}" style="font-size:.65rem;padding:2px 5px">${openPos.direction}</span> <span class="font-mono text-dim">${(openPos.pair || '').replace('USDT','').replace('1000','')}</span>`
+      : '<span class="text-dim">--</span>';
     lbHtml += `<tr${rowClass} style="cursor:pointer" onclick="window._selectStrategy('${s.id}')">
       <td>${i + 1}</td>
       <td class="font-mono">${s.id}</td>
       <td>${s.name}</td>
       <td><span class="pill pill-${phase}">${phase}</span></td>
+      <td>${tradingCell}</td>
       <td class="font-mono ${s.balance >= 1000 ? 'text-green' : 'text-red'}">$${fmt(s.balance)}</td>
       <td>${s.trades}</td>
       <td>${s.win_rate}%</td>

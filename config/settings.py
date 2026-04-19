@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     BINANCE_SECRET: str = ""
     BINANCE_TESTNET: bool = False
 
+    # Security
+    ADMIN_API_KEY: str = ""
+
     # Trading
     PAIRS: str = "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT"
     MODE: str = "paper"

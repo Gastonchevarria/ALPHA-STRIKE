@@ -1,11 +1,18 @@
 """API Router for Agent GOD 2 tournament endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Header
 
+from config.settings import settings
 from core.market_regime import get_cached_regime
 from core.correlation_engine import get_correlation_matrix
 
 router_god2 = APIRouter(tags=["Agent GOD 2"])
+
+async def verify_admin(x_api_key: str = Header(None)):
+    if not settings.ADMIN_API_KEY:
+        return  # Auth disable if no key is set yet
+    if x_api_key != settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized - Invalid API Key")
 
 
 def get_runner(request: Request):
@@ -53,13 +60,13 @@ async def coordinator(runner=Depends(get_runner)):
     }
 
 
-@router_god2.post("/tournament/pause")
+@router_god2.post("/tournament/pause", dependencies=[Depends(verify_admin)])
 async def pause(runner=Depends(get_runner)):
     runner.pause()
     return {"status": "paused"}
 
 
-@router_god2.post("/tournament/resume")
+@router_god2.post("/tournament/resume", dependencies=[Depends(verify_admin)])
 async def resume(runner=Depends(get_runner)):
     runner.resume()
     return {"status": "resumed"}
@@ -101,12 +108,12 @@ async def promotion_pipeline(runner=Depends(get_runner)):
     return runner.promotion.get_pipeline()
 
 
-@router_god2.post("/promotion/strategy/{strategy_id}/promote")
+@router_god2.post("/promotion/strategy/{strategy_id}/promote", dependencies=[Depends(verify_admin)])
 async def force_promote(strategy_id: str, runner=Depends(get_runner)):
     return runner.promotion.force_promote(strategy_id)
 
 
-@router_god2.post("/promotion/strategy/{strategy_id}/demote")
+@router_god2.post("/promotion/strategy/{strategy_id}/demote", dependencies=[Depends(verify_admin)])
 async def demote(strategy_id: str, runner=Depends(get_runner)):
     return runner.promotion.demote(strategy_id)
 
@@ -133,13 +140,13 @@ async def live_capital(runner=Depends(get_runner)):
     return {"total_live_capital": round(total, 2)}
 
 
-@router_god2.post("/live/halt")
+@router_god2.post("/live/halt", dependencies=[Depends(verify_admin)])
 async def halt_live(runner=Depends(get_runner)):
     runner.circuit_breaker.live_triggered = True
     return {"status": "LIVE_HALTED"}
 
 
-@router_god2.post("/live/resume")
+@router_god2.post("/live/resume", dependencies=[Depends(verify_admin)])
 async def resume_live(runner=Depends(get_runner)):
     runner.circuit_breaker.reset_live()
     return {"status": "LIVE_RESUMED"}
@@ -152,7 +159,7 @@ async def eliminator_status(runner=Depends(get_runner)):
     return runner.eliminator.full_status()
 
 
-@router_god2.post("/tournament/strategy/{strategy_id}/reactivate")
+@router_god2.post("/tournament/strategy/{strategy_id}/reactivate", dependencies=[Depends(verify_admin)])
 async def reactivate(strategy_id: str, runner=Depends(get_runner)):
     return runner.eliminator.reactivate(strategy_id)
 
@@ -162,7 +169,7 @@ async def cb_status(runner=Depends(get_runner)):
     return runner.circuit_breaker.status()
 
 
-@router_god2.post("/tournament/circuit-breaker/reset/{level}")
+@router_god2.post("/tournament/circuit-breaker/reset/{level}", dependencies=[Depends(verify_admin)])
 async def cb_reset(level: str, runner=Depends(get_runner)):
     if level == "paper":
         runner.circuit_breaker.reset_paper()
@@ -222,7 +229,7 @@ async def ml_volatility(pair: str):
     return await get_volatility(pair)
 
 
-@router_god2.post("/ml/retrain")
+@router_god2.post("/ml/retrain", dependencies=[Depends(verify_admin)])
 async def ml_retrain_trigger(runner=Depends(get_runner)):
     import asyncio
     asyncio.create_task(runner._run_ml_retrain())

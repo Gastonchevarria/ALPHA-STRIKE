@@ -35,7 +35,7 @@ class MemoryHeartbeat:
 
     async def nightly_reflection(self, strategies_summary: str = ""):
         """Daily reflection: analyze mid-tier and promote patterns to long-term."""
-        if not settings.ANTHROPIC_API_KEY:
+        if not settings.GEMINI_API_KEY:
             return
 
         entries = get_recent("mid", limit=20)

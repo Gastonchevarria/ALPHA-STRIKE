@@ -1,4 +1,9 @@
+# Environment & Secrets
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -10,5 +15,18 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.venv/
+venv/
+
+# Data & Models (runtime generated)
 data/
+models/
+learnings/
 *.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config.settings import settings
+from ml import inference as ml_inference
 from core.circuit_breaker import CircuitBreaker
 from core.correlation_engine import compute_correlation_matrix, get_correlation_matrix
 from core.data_fetcher import get_current_price, prefetch_all
@@ -40,7 +41,7 @@ class TournamentRunnerGOD2:
 
     def __init__(self):
         bal = settings.INITIAL_BALANCE
-        api_key = settings.ANTHROPIC_API_KEY
+        api_key = settings.GEMINI_API_KEY
         model = settings.EXEC_MODEL
 
         common = dict(initial_balance=bal, api_key=api_key, exec_model=model)
@@ -120,6 +121,17 @@ class TournamentRunnerGOD2:
         self.scheduler.add_job(self._nightly_reflection, "cron", hour=2, minute=0, id="nightly")
         self.scheduler.add_job(self._check_promotions, "cron", minute=30, id="promotions")
 
+        # ML retraining job (weekly)
+        if settings.ML_ENABLED:
+            self.scheduler.add_job(
+                self._run_ml_retrain,
+                "cron",
+                day_of_week=settings.ML_RETRAIN_DAY,
+                hour=settings.ML_RETRAIN_HOUR_UTC,
+                minute=0,
+                id="ml_retrain",
+            )
+
         self.scheduler.start()
         self._started = True
         logger.info(f"=== Agent GOD 2 ONLINE === {len(self.strategies)} strategies × {len(self.pairs)} pairs")
@@ -166,11 +178,42 @@ class TournamentRunnerGOD2:
         if result:
             pair = result["pair"]
             signal = result["signal"]
+
+            # ML checks (if enabled)
+            if settings.ML_ENABLED:
+                # 1. ML regime check
+                ml_regime = await ml_inference.get_regime_prediction(pair)
+                if ml_regime["confidence"] >= settings.ML_REGIME_CONFIDENCE_THRESHOLD:
+                    if "ANY" not in strat.cfg.regime_filter and ml_regime["regime"] not in strat.cfg.regime_filter:
+                        strat.skip_count += 1
+                        logger.info(f"[{strat.cfg.id}] ML regime mismatch: predicted {ml_regime['regime']}, filter {strat.cfg.regime_filter}")
+                        return
+
+                # 2. EV check
+                ev = await ml_inference.get_expected_value(strat.cfg.id, pair)
+                if ev.get("expected_pnl_usd") is not None and ev.get("n_samples_trained_on", 0) >= settings.ML_MIN_TRADES_FOR_EV_MODEL:
+                    if ev["expected_pnl_usd"] < settings.ML_MIN_EV_USD:
+                        strat.skip_count += 1
+                        logger.info(f"[{strat.cfg.id}] ML EV too low: ${ev['expected_pnl_usd']:.2f} < ${settings.ML_MIN_EV_USD}")
+                        return
+
+                # 3. Volatility adjustment
+                vol_pred = await ml_inference.get_volatility(pair)
+                vol_ratio = max(settings.ML_VOL_RATIO_MIN, min(settings.ML_VOL_RATIO_MAX, vol_pred.get("vol_ratio", 1.0)))
+                adjusted_tp = strat.cfg.tp_pct * vol_ratio
+                adjusted_sl = strat.cfg.sl_pct * vol_ratio
+            else:
+                adjusted_tp = strat.cfg.tp_pct
+                adjusted_sl = strat.cfg.sl_pct
+
             price = await get_current_price(pair)
-            strat.open_position(signal.direction, price, pair, signal.signals)
+            strat.open_position_with_custom_params(
+                signal.direction, price, pair, signal.signals,
+                tp_pct=adjusted_tp, sl_pct=adjusted_sl,
+            )
             logger.info(
                 f"[{strat.cfg.id}] OPEN {signal.direction} {pair} @ {price:.2f} "
-                f"(conf={result['effective_confidence']:.2f})"
+                f"(conf={result['effective_confidence']:.2f}, tp={adjusted_tp*100:.2f}%, sl={adjusted_sl*100:.2f}%)"
             )
 
     async def _check_all_exits(self):
@@ -229,6 +272,22 @@ class TournamentRunnerGOD2:
         actions = self.promotion.check_promotions(recs)
         for a in actions:
             logger.info(f"PROMOTION: {a['id']} → {a['action']}: {a['reason']}")
+
+    async def _run_ml_retrain(self):
+        """Weekly ML model retraining."""
+        logger.info("=== Weekly ML retrain triggered ===")
+        try:
+            from ml.training_pipeline import run_full_training
+            summary = await run_full_training()
+            logger.info(f"ML retrain summary: {summary}")
+            from core.memory_tiers import add_memory
+            add_memory(
+                "long",
+                f"[ML RETRAIN] Completed in {summary.get('duration_seconds', 0):.0f}s. Models: {list(summary.get('models', {}).keys())}",
+                tags=["ml_retrain"],
+            )
+        except Exception as e:
+            logger.error(f"ML retrain failed: {e}")
 
     def _bg_task(self, coro):
         task = asyncio.create_task(coro)

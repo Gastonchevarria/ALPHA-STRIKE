@@ -1,4 +1,4 @@
-"""Tournament Coordinator — Claude Opus 4.6 brain for confidence adjustment."""
+"""Tournament Coordinator — Gemini brain for confidence adjustment."""
 
 import json
 import logging
@@ -53,7 +53,7 @@ Rules:
         regimes: dict,
         correlation: dict,
     ) -> dict | None:
-        if not settings.ANTHROPIC_API_KEY:
+        if not settings.GEMINI_API_KEY:
             return None
 
         memory_ctx = get_all_context(max_per_tier=5)

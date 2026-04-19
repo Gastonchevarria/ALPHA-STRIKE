@@ -189,3 +189,49 @@ async def learnings():
         path = Path("learnings") / fname
         result[fname] = path.read_text() if path.exists() else ""
     return result
+
+
+# --- ML Endpoints ---
+
+@router_god2.get("/ml/status")
+async def ml_status():
+    from ml.model_store import list_models
+    from config.settings import settings
+    return {
+        "enabled": settings.ML_ENABLED,
+        "models": list_models(),
+        "cache_ttl_seconds": settings.ML_INFERENCE_CACHE_SECONDS,
+    }
+
+
+@router_god2.get("/ml/regime/{pair}")
+async def ml_regime(pair: str):
+    from ml.inference import get_regime_prediction
+    return await get_regime_prediction(pair)
+
+
+@router_god2.get("/ml/ev/{strategy_id}/{pair}")
+async def ml_ev(strategy_id: str, pair: str):
+    from ml.inference import get_expected_value
+    return await get_expected_value(strategy_id, pair)
+
+
+@router_god2.get("/ml/volatility/{pair}")
+async def ml_volatility(pair: str):
+    from ml.inference import get_volatility
+    return await get_volatility(pair)
+
+
+@router_god2.post("/ml/retrain")
+async def ml_retrain_trigger(runner=Depends(get_runner)):
+    import asyncio
+    asyncio.create_task(runner._run_ml_retrain())
+    return {"status": "retrain_started"}
+
+
+@router_god2.get("/ml/training-history")
+async def ml_training_history():
+    from core.memory_tiers import get_recent
+    entries = get_recent("long", limit=50)
+    return [e for e in entries if "ml_retrain" in e.get("tags", [])]
+

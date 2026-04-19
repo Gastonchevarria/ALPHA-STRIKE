@@ -1,4 +1,4 @@
-"""Per-trade AI post-mortem analysis using Claude Opus 4.6."""
+"""Per-trade AI post-mortem analysis using Gemini."""
 
 import json
 import logging
@@ -53,7 +53,7 @@ Rules:
         market_context: str,
         ltm,
     ) -> dict | None:
-        if not self.enabled or not settings.ANTHROPIC_API_KEY:
+        if not self.enabled or not settings.GEMINI_API_KEY:
             return None
 
         prompt = (

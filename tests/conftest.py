@@ -29,7 +29,7 @@ def mock_settings():
     """Return settings with test defaults."""
     from config.settings import Settings
     return Settings(
-        ANTHROPIC_API_KEY="test-key",
+        GEMINI_API_KEY="test-key",
         MODE="paper",
         INITIAL_BALANCE=1000.0,
         PORT=9999,

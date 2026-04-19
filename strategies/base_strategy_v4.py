@@ -91,7 +91,7 @@ class BaseStrategyV4(ABC):
         config: StrategyConfig,
         initial_balance: float = 1000.0,
         api_key: str = "",
-        exec_model: str = "claude-opus-4-6",
+        exec_model: str = "gemini-3-flash-preview",
         self_trainer_enabled: bool = True,
     ):
         self.cfg = config
@@ -194,6 +194,36 @@ class BaseStrategyV4(ABC):
         self._entry_margin = margin
 
         self._log("OPEN", direction, price, None, None, signals, margin, pair)
+
+    def open_position_with_custom_params(
+        self,
+        direction: str,
+        price: float,
+        pair: str,
+        signals: dict,
+        tp_pct: float | None = None,
+        sl_pct: float | None = None,
+    ):
+        """Same as open_position but allows runtime TP/SL override (used by ML layer)."""
+        effective_tp = tp_pct if tp_pct is not None else self.cfg.tp_pct
+        effective_sl = sl_pct if sl_pct is not None else self.cfg.sl_pct
+
+        margin = self._effective_margin()
+        notional = margin * self.cfg.leverage
+        mult = 1 if direction == "LONG" else -1
+
+        self.tp_abs = price * (1 + effective_tp * mult)
+        self.sl_abs = price * (1 - effective_sl * mult)
+        self.position = direction
+
+        self._entry_price = price
+        self._entry_dir = direction
+        self._entry_pair = pair
+        self._entry_sig = {**signals, "ml_tp_pct": effective_tp, "ml_sl_pct": effective_sl}
+        self._entry_time = datetime.now(timezone.utc)
+        self._entry_margin = margin
+
+        self._log("OPEN", direction, price, None, None, self._entry_sig, margin, pair)
 
     def check_exit(self, price: float) -> str | None:
         """Check if position should be closed. Returns reason or None."""

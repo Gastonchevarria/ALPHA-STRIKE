@@ -5,9 +5,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # AI
-    ANTHROPIC_API_KEY: str = ""
-    BRAIN_MODEL: str = "claude-opus-4-6"
-    EXEC_MODEL: str = "claude-opus-4-6"
+    GEMINI_API_KEY: str = ""
+    BRAIN_MODEL: str = "gemini-3.1-pro-preview"
+    EXEC_MODEL: str = "gemini-3-flash-preview"
 
     # Binance
     BINANCE_API_KEY: str = ""
@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     # Memory
     MEMORY_HEARTBEAT_INTERVAL_MIN: int = 20
     MEMORY_REFLECTION_HOUR_UTC: int = 2
+
+    # ML Layer
+    ML_ENABLED: bool = True
+    ML_MIN_EV_USD: float = 0.50
+    ML_REGIME_CONFIDENCE_THRESHOLD: float = 0.70
+    ML_VOL_RATIO_MIN: float = 0.70
+    ML_VOL_RATIO_MAX: float = 1.50
+    ML_RETRAIN_DAY: int = 6  # Sunday (0=Mon, 6=Sun)
+    ML_RETRAIN_HOUR_UTC: int = 3
+    ML_HISTORICAL_DAYS: int = 90
+    ML_GCS_BUCKET: str = "agent-god-2-data"
+    ML_INFERENCE_CACHE_SECONDS: int = 30
+    ML_MIN_TRADES_FOR_EV_MODEL: int = 50
 
     # Signal
     MIN_CONFIDENCE: float = 0.72

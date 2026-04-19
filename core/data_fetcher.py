@@ -1,4 +1,5 @@
 """Binance data fetcher with smart caching and multi-pair support."""
+from __future__ import annotations
 
 import asyncio
 import logging
